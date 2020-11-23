@@ -13,8 +13,13 @@
 // the License.
 
 using CommandLine;
+using Google.Cloud.Storage.V1;
 using Google.Cloud.Vision.V1;
+using Google.Protobuf;
 using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 
 namespace GoogleCloudSamples
 {
@@ -43,7 +48,11 @@ namespace GoogleCloudSamples
     class DetectLandmarksOptions : ImageOptions { }
 
     [Verb("text", HelpText = "Detect text.")]
-    class DetectTextOptions : ImageOptions { }
+    class DetectTextOptions : ImageOptions
+    {
+        [Option('m', HelpText = "Uses multi-region endpoint")]
+        public bool EnableMultiRegion { get; set; }
+    }
 
     [Verb("logos", HelpText = "Detect logos.")]
     class DetectLogosOptions : ImageOptions { }
@@ -56,6 +65,23 @@ namespace GoogleCloudSamples
 
     [Verb("doc-text", HelpText = "Detect text in a document image.")]
     class DetectDocTextOptions : ImageOptions { }
+
+    [Verb("ocr", HelpText = "Performs document text OCR.")]
+    class DetectDocumentOptions
+    {
+        [Value(0, HelpText = "The Google Storage location of the source file")]
+        public string SourceURI { get; set; }
+
+        [Value(1, HelpText = "The destination Google Storage bucket name (no schema)")]
+        public string OutputBucket { get; set; }
+
+        [Value(1, HelpText = "The destination Google Storage prefix (no bucket name)")]
+        public string OutputPrefix { get; set; }
+    }
+
+    [Verb("object-localization", HelpText = "Localize objects in the image")]
+    class DetectObjectLocalizationOptions : ImageOptions { }
+
 
     public class DetectProgram
     {
@@ -171,6 +197,7 @@ namespace GoogleCloudSamples
             Console.WriteLine("Spoof: {0}", response.Spoof.ToString());
             Console.WriteLine("Medical: {0}", response.Medical.ToString());
             Console.WriteLine("Violence: {0}", response.Violence.ToString());
+            Console.WriteLine("Racy: {0}", response.Racy.ToString());
             // [END vision_safe_search_detection_gcs]
             // [END vision_safe_search_detection]
             return 0;
@@ -228,6 +255,23 @@ namespace GoogleCloudSamples
             return 0;
         }
 
+        private static object DetectTextWithLocation(Image image)
+        {
+            // [START vision_set_endpoint]
+            // Instantiate a client connected to the 'eu' location.
+            var client = new ImageAnnotatorClientBuilder
+            {
+                Endpoint = "eu-vision.googleapis.com"
+            }.Build();
+            // [END vision_set_endpoint]
+            var response = client.DetectText(image);
+            foreach (var annotation in response)
+            {
+                if (annotation.Description != null)
+                    Console.WriteLine(annotation.Description);
+            }
+            return 0;
+        }
 
         private static object DetectLogos(Image image)
         {
@@ -318,6 +362,114 @@ namespace GoogleCloudSamples
             return 0;
         }
 
+        private static object DetectObjectLocalization(Image image)
+        {
+            // [START vision_localize_objects]
+            // [START vision_localize_objects_gcs]
+            var client = ImageAnnotatorClient.Create();
+            var response = client.DetectLocalizedObjects(image);
+
+            Console.WriteLine($"Number of objects found {response.Count}");
+            foreach (var localizedObject in response)
+            {
+                Console.Write($"\n{localizedObject.Name}");
+                Console.WriteLine($" (confidence: {localizedObject.Score})");
+                Console.WriteLine("Normalized bounding polygon vertices: ");
+
+                foreach (var vertex
+                        in localizedObject.BoundingPoly.NormalizedVertices)
+                {
+                    Console.WriteLine($" - ({vertex.X}, {vertex.Y})");
+                }
+            }
+            // [END vision_localize_objects_gcs]
+            // [END vision_localize_objects]
+            return 0;
+        }
+
+        // [START vision_text_detection_pdf_gcs]
+        private static object DetectDocument(string gcsSourceUri,
+            string gcsDestinationBucketName, string gcsDestinationPrefixName)
+        {
+            var client = ImageAnnotatorClient.Create();
+
+            var asyncRequest = new AsyncAnnotateFileRequest
+            {
+                InputConfig = new InputConfig
+                {
+                    GcsSource = new GcsSource
+                    {
+                        Uri = gcsSourceUri
+                    },
+                    // Supported mime_types are: 'application/pdf' and 'image/tiff'
+                    MimeType = "application/pdf"
+                },
+                OutputConfig = new OutputConfig
+                {
+                    // How many pages should be grouped into each json output file.
+                    BatchSize = 2,
+                    GcsDestination = new GcsDestination
+                    {
+                        Uri = $"gs://{gcsDestinationBucketName}/{gcsDestinationPrefixName}"
+                    }
+                }
+            };
+
+            asyncRequest.Features.Add(new Feature
+            {
+                Type = Feature.Types.Type.DocumentTextDetection
+            });
+
+            List<AsyncAnnotateFileRequest> requests =
+                new List<AsyncAnnotateFileRequest>();
+            requests.Add(asyncRequest);
+
+            var operation = client.AsyncBatchAnnotateFiles(requests);
+
+            Console.WriteLine("Waiting for the operation to finish");
+
+            operation.PollUntilCompleted();
+
+            // Once the rquest has completed and the output has been
+            // written to GCS, we can list all the output files.
+            var storageClient = StorageClient.Create();
+
+            // List objects with the given prefix.
+            var blobList = storageClient.ListObjects(gcsDestinationBucketName,
+                gcsDestinationPrefixName);
+            Console.WriteLine("Output files:");
+            foreach (var blob in blobList)
+            {
+                Console.WriteLine(blob.Name);
+            }
+
+            // Process the first output file from GCS.
+            // Select the first JSON file from the objects in the list.
+            var output = blobList.Where(x => x.Name.Contains(".json")).First();
+
+            var jsonString = "";
+            using (var stream = new MemoryStream())
+            {
+                storageClient.DownloadObject(output, stream);
+                jsonString = System.Text.Encoding.UTF8.GetString(stream.ToArray());
+            }
+
+            var response = JsonParser.Default
+                        .Parse<AnnotateFileResponse>(jsonString);
+
+            // The actual response for the first page of the input file.
+            var firstPageResponses = response.Responses[0];
+            var annotation = firstPageResponses.FullTextAnnotation;
+
+            // Here we print the full text from the first page.
+            // The response contains more information:
+            // annotation/pages/blocks/paragraphs/words/symbols
+            // including confidence scores and bounding boxes
+            Console.WriteLine($"Full text: \n {annotation.Text}");
+
+            return 0;
+        }
+        // [END vision_text_detection_pdf_gcs]
 
         public static void Main(string[] args)
         {
@@ -331,7 +483,9 @@ namespace GoogleCloudSamples
                 DetectLandmarksOptions,
                 DetectCropHintOptions,
                 DetectWebOptions,
-                DetectDocTextOptions
+                DetectDocTextOptions,
+                DetectDocumentOptions,
+                DetectObjectLocalizationOptions
                 >(args)
               .MapResult(
                 (DetectLabelsOptions opts) => DetectLabels(ImageFromArg(opts.FilePath)),
@@ -339,11 +493,15 @@ namespace GoogleCloudSamples
                 (DetectPropertiesOptions opts) => DetectProperties(ImageFromArg(opts.FilePath)),
                 (DetectFacesOptions opts) => DetectFaces(ImageFromArg(opts.FilePath)),
                 (DetectLandmarksOptions opts) => DetectLandmarks(ImageFromArg(opts.FilePath)),
-                (DetectTextOptions opts) => DetectText(ImageFromArg(opts.FilePath)),
+                (DetectTextOptions opts) => opts.EnableMultiRegion ?
+                    DetectTextWithLocation(ImageFromArg(opts.FilePath))
+                    : DetectText(ImageFromArg(opts.FilePath)),
                 (DetectLogosOptions opts) => DetectLogos(ImageFromArg(opts.FilePath)),
                 (DetectCropHintOptions opts) => DetectCropHint(ImageFromArg(opts.FilePath)),
                 (DetectWebOptions opts) => DetectWeb(ImageFromArg(opts.FilePath)),
                 (DetectDocTextOptions opts) => DetectDocText(ImageFromArg(opts.FilePath)),
+                (DetectDocumentOptions opts) => DetectDocument(opts.SourceURI, opts.OutputBucket, opts.OutputPrefix),
+                (DetectObjectLocalizationOptions opts) => DetectObjectLocalization(ImageFromArg(opts.FilePath)),
                 errs => 1);
         }
     }

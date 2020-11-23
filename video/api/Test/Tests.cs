@@ -38,6 +38,11 @@ namespace GoogleCloudSamples.VideoIntelligence
     {
         readonly List<string> _tempFiles = new List<string>();
 
+        const string FoxSnatchedMp4 = "gs://cloudmleap/video/next/fox-snatched.mp4";
+        const string GbikesDinosaurMp4 = "gs://cloud-samples-data/video/gbikes_dinosaur.mp4";
+        const string GoogleWorkShortMp4 = "gs://python-docs-samples-tests/video/googlework_short.mp4";
+        const string CatMp4 = "gs://cloud-samples-data/video/cat.mp4";
+
         readonly CommandLineRunner _analyze = new CommandLineRunner()
         {
             VoidMain = Analyzer.Main,
@@ -62,7 +67,7 @@ namespace GoogleCloudSamples.VideoIntelligence
         void TestSplitGcsUri()
         {
             string bucket;
-            string objectName = SplitGcsUri("gs://cloudmleap/video/next/fox-snatched.mp4",
+            string objectName = SplitGcsUri(FoxSnatchedMp4,
                 out bucket);
             Assert.Equal("cloudmleap", bucket);
             Assert.Equal("video/next/fox-snatched.mp4", objectName);
@@ -86,17 +91,17 @@ namespace GoogleCloudSamples.VideoIntelligence
         void TestShotsGcs()
         {
             ConsoleOutput output = _analyze.Run("shots",
-                "gs://cloudmleap/video/next/fox-snatched.mp4");
+                FoxSnatchedMp4);
             Assert.Equal(0, output.ExitCode);
             Assert.Contains("Start Time Offset", output.Stdout);
             Assert.Contains("End Time Offset", output.Stdout);
         }
 
-        [Fact]
+        [Fact(Skip = "https://github.com/GoogleCloudPlatform/dotnet-docs-samples/issues/1002")]
         void TestLabels()
         {
             ConsoleOutput output = _analyze.Run("labels",
-                DownloadGcsObject(@"gs://demomaker/cat.mp4"));
+                DownloadGcsObject(@CatMp4));
             Assert.Equal(0, output.ExitCode);
             Assert.Contains("Cat", output.Stdout, StringComparison.InvariantCultureIgnoreCase);
         }
@@ -105,15 +110,39 @@ namespace GoogleCloudSamples.VideoIntelligence
         void TestLabelsGcs()
         {
             ConsoleOutput output = _analyze.Run("labels",
-                @"gs://demomaker/cat.mp4");
+                @CatMp4);
             Assert.Equal(0, output.ExitCode);
             Assert.Contains("Cat", output.Stdout, StringComparison.InvariantCultureIgnoreCase);
+        }
+
+        [Fact]
+        void TestDetectLogo()
+        {
+            ConsoleOutput output = _analyze.Run("logo-detect",
+                DownloadGcsObject(GoogleWorkShortMp4));
+            Assert.Equal(0, output.ExitCode);
+            Assert.Contains("Description", output.Stdout, StringComparison.InvariantCultureIgnoreCase);
+            Assert.Contains("Confidence", output.Stdout, StringComparison.InvariantCultureIgnoreCase);
+            Assert.Contains("Start Time Offset", output.Stdout, StringComparison.InvariantCultureIgnoreCase);
+            Assert.Contains("End Time Offset", output.Stdout, StringComparison.InvariantCultureIgnoreCase);
+        }
+
+        [Fact]
+        void TestDetectLogoGcs()
+        {
+            ConsoleOutput output = _analyze.Run("logo-detect",
+                GoogleWorkShortMp4);
+            Assert.Equal(0, output.ExitCode);
+            Assert.Contains("Description", output.Stdout, StringComparison.InvariantCultureIgnoreCase);
+            Assert.Contains("Confidence", output.Stdout, StringComparison.InvariantCultureIgnoreCase);
+            Assert.Contains("Start Time Offset", output.Stdout, StringComparison.InvariantCultureIgnoreCase);
+            Assert.Contains("End Time Offset", output.Stdout, StringComparison.InvariantCultureIgnoreCase);
         }
 
         void TestFaces()
         {
             ConsoleOutput output =
-                _analyze.Run("faces", DownloadGcsObject("gs://demomaker/gbike.mp4"));
+                _analyze.Run("faces", DownloadGcsObject(GbikesDinosaurMp4));
             Assert.Equal(0, output.ExitCode);
         }
 
@@ -121,9 +150,57 @@ namespace GoogleCloudSamples.VideoIntelligence
         void TestExplicitContentGcs()
         {
             ConsoleOutput output =
-                _analyze.Run("explicit-content", "gs://demomaker/gbike.mp4");
+                _analyze.Run("explicit-content", GbikesDinosaurMp4);
             Assert.Equal(0, output.ExitCode);
             Assert.Contains("Pornography", output.Stdout);
+        }
+
+        [Fact]
+        void TestTranscriptionGcs()
+        {
+            ConsoleOutput output =
+                _analyze.Run("transcribe", GoogleWorkShortMp4);
+            Assert.Equal(0, output.ExitCode);
+            Assert.Contains("France", output.Stdout);
+        }
+
+        [Fact]
+        void TestTextDetection()
+        {
+            ConsoleOutput output =
+                _analyze.Run("text", DownloadGcsObject(GoogleWorkShortMp4));
+            Assert.Equal(0, output.ExitCode);
+            Assert.Contains("Start time:", output.Stdout);
+            Assert.Contains("Confidence:", output.Stdout);
+        }
+
+        [Fact]
+        void TestTextDetectionGcs()
+        {
+            ConsoleOutput output =
+                _analyze.Run("text", GoogleWorkShortMp4);
+            Assert.Equal(0, output.ExitCode);
+
+            Assert.Contains("Start time:", output.Stdout);
+            Assert.Contains("Confidence:", output.Stdout);
+        }
+
+        [Fact(Skip = "https://github.com/GoogleCloudPlatform/dotnet-docs-samples/issues/1002")]
+        void TestObjectTracking()
+        {
+            ConsoleOutput output =
+                _analyze.Run("track-object", DownloadGcsObject(CatMp4));
+            Assert.Equal(0, output.ExitCode);
+            Assert.Contains("cat", output.Stdout);
+        }
+
+        [Fact]
+        void TestObjectTrackingGcs()
+        {
+            ConsoleOutput output =
+                _analyze.Run("track-object", CatMp4);
+            Assert.Equal(0, output.ExitCode);
+            Assert.Contains("cat", output.Stdout);
         }
 
         void IDisposable.Dispose()

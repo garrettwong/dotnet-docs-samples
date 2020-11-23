@@ -14,6 +14,8 @@
  * the License.
  */
 
+using Google.Cloud.Diagnostics.AspNetCore;
+using Google.Cloud.Diagnostics.Common;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -48,6 +50,16 @@ namespace CloudSql
         // http://go.microsoft.com/fwlink/?LinkID=398940
         public void ConfigureServices(IServiceCollection services)
         {
+            string projectId = Google.Api.Gax.Platform.Instance().ProjectId;
+            if (!string.IsNullOrEmpty(projectId))
+            {
+                services.AddGoogleExceptionLogging(options =>
+                {
+                    options.ProjectId = projectId;
+                    options.ServiceName = "CloudSqlSample";
+                    options.Version = "Test";
+                });
+            }
             services.AddSingleton(typeof(DbConnection), (IServiceProvider) =>
                 InitializeDatabase());
             services.AddMvc(options =>
@@ -78,9 +90,9 @@ namespace CloudSql
             using (var createTableCommand = connection.CreateCommand())
             {
                 createTableCommand.CommandText = @"
-                    CREATE TABLE IF NOT EXISTS 
+                    CREATE TABLE IF NOT EXISTS
                     visits (
-                        time_stamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP, 
+                        time_stamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         user_ip CHAR(64)
                     )";
                 createTableCommand.ExecuteNonQuery();
@@ -90,40 +102,31 @@ namespace CloudSql
 
         DbConnection NewMysqlConnection()
         {
-            // [START mysql_connection]
+            // [START gae_flex_mysql_env]
             var connectionString = new MySqlConnectionStringBuilder(
                 Configuration["CloudSql:ConnectionString"])
             {
-                SslMode = MySqlSslMode.Required,
-                CertificateFile =
-                    Configuration["CloudSql:CertificateFile"]
+                // Connecting to a local proxy that does not support ssl.
+                SslMode = MySqlSslMode.None,
             };
-            if (string.IsNullOrEmpty(connectionString.Database))
-                connectionString.Database = "visitors";
             DbConnection connection =
                 new MySqlConnection(connectionString.ConnectionString);
-            // [END mysql_connection]
+            // [END gae_flex_mysql_env]
             return connection;
         }
 
         DbConnection NewPostgreSqlConnection()
         {
-            // [START postgresql_connection]
+            // [START gae_flex_postgres_env]
             var connectionString = new NpgsqlConnectionStringBuilder(
                 Configuration["CloudSql:ConnectionString"])
             {
-                SslMode = SslMode.Require,
-                TrustServerCertificate = true,
-                UseSslStream = true,
+                // Connecting to a local proxy that does not support ssl.
+                SslMode = SslMode.Disable
             };
-            if (string.IsNullOrEmpty(connectionString.Database))
-                connectionString.Database = "visitors";
             NpgsqlConnection connection =
                 new NpgsqlConnection(connectionString.ConnectionString);
-            connection.ProvideClientCertificatesCallback +=
-                certs => certs.Add(new X509Certificate2(
-                    Configuration["CloudSql:CertificateFile"]));
-            // [END postgresql_connection]
+            // [END gae_flex_postgres_env]
             return connection;
         }
 
@@ -139,6 +142,8 @@ namespace CloudSql
             }
             else
             {
+                // Configure error reporting service.
+                app.UseGoogleExceptionLogging();
                 app.UseExceptionHandler("/Home/Error");
             }
 

@@ -22,13 +22,15 @@ get-command choco -ErrorAction Stop
 choco list -li | Tee-Object -Variable chocoList
 $chocoPackages = ($chocoList) -join ' '
 
-if (-not $chocoPackages.Contains('Microsoft .NET Core SDK - 2.0.')) {
-    choco install -y --sxs dotnetcore-sdk --version 2.0.0    
+if (-not $chocoPackages.Contains('Microsoft .NET Core SDK - 2.1.4')) {
+    choco install -y --sxs dotnetcore-sdk --version 2.2.203
 }
 
-if (-not $chocoPackages.Contains('.NET Core SDK 1.1.')) {
-    choco install -y --sxs dotnetcore-sdk --version 1.1.2    
+if (-not $chocoPackages.Contains('.NET Core SDK 3.1.')) {
+    choco install -y --sxs dotnetcore-sdk --version 3.1.201
 }
+
+dotnet --info
 
 if (-not $chocoPackages.Contains('nuget.commandline 4.5.')) {
     choco install -y nuget.commandline
@@ -43,8 +45,8 @@ if (-not (($chocoPackages.Contains('python 2.7.') -or
     choco install -y --sxs python --version 2.7.6
 }
 
-if (-not $chocoPackages.Contains('selenium-chrome-driver 2.')) {
-    choco install -y selenium-chrome-driver
+if (-not $chocoPackages.Contains('selenium-chrome-driver 77.')) {
+    choco install -y selenium-chrome-driver --version 77.0.3865.40
 }
 if (-not $chocoPackages.Contains('iisexpress')) {
     choco install -y --sxs iisexpress

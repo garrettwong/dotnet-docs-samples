@@ -14,13 +14,12 @@
  * the License.
  */
 
-using System;
 using Google.Cloud.Logging.V2;
-using Xunit;
-using System.Diagnostics;
-using System.Collections.Generic;
 using Grpc.Core;
+using System;
+using System.Collections.Generic;
 using System.Linq;
+using Xunit;
 
 namespace GoogleCloudSamples
 {
@@ -68,30 +67,50 @@ namespace GoogleCloudSamples
         {
             public void Dispose()
             {
-                try
+                var exceptions = new List<Exception>();
+                // Delete all logs created from running the tests.
+                foreach (string log in _logsToDelete)
                 {
-                    // Delete all logs created from running the tests.
-                    foreach (string log in _logsToDelete)
+                    try
                     {
                         Run("delete-log", log);
                     }
+                    catch (RpcException ex)
+                    when (ex.Status.StatusCode == StatusCode.NotFound)
+                    { }
+                    catch (Exception e)
+                    {
+                        exceptions.Add(e);
+                    }
                 }
-                catch (RpcException ex) when (ex.Status.StatusCode == StatusCode.NotFound) { }
-                try
+                // Delete all the log sinks created from running the tests.
+                foreach (string sink in _sinksToDelete)
                 {
-                    // Delete all the log sinks created from running the tests.
-                    foreach (string sink in _sinksToDelete)
+                    try
                     {
                         Run("delete-sink", sink);
                     }
+                    catch (RpcException ex)
+                    when (ex.Status.StatusCode == StatusCode.NotFound)
+                    { }
+                    catch (Exception e)
+                    {
+                        exceptions.Add(e);
+                    }
                 }
-                catch (RpcException ex) when (ex.Status.StatusCode == StatusCode.NotFound) { }
+                if (exceptions.Count > 0)
+                {
+                    throw new AggregateException(exceptions);
+                }
             }
+
+            static string RandomName() =>
+                GoogleCloudSamples.TestUtil.RandomName();
 
             [Fact]
             public void TestCreateLogEntry()
             {
-                string logId = "logForTestCreateLogEntry";
+                string logId = "logForTestCreateLogEntry" + RandomName();
                 string message = "Example log entry.";
                 _logsToDelete.Add(logId);
                 // Try creating a log entry.
@@ -106,10 +125,10 @@ namespace GoogleCloudSamples
                 });
             }
 
-            [Fact]
+            [Fact(Skip = "https://github.com/GoogleCloudPlatform/dotnet-docs-samples/issues/1066")]
             public void TestListEntries()
             {
-                string logId = "logForTestListEntries";
+                string logId = "logForTestListEntries" + RandomName();
                 string message1 = "Example log entry.";
                 string message2 = "Another example log entry.";
                 string message3 = "Additional example log entry.";
@@ -131,7 +150,7 @@ namespace GoogleCloudSamples
             public void TestWithLogId()
             {
                 StackdriverLogWriter.ProjectId = _projectId;
-                StackdriverLogWriter.LogId = "TestWithLogId";
+                StackdriverLogWriter.LogId = "TestWithLogId" + RandomName();
                 string message1 = "TestWithLogId test example";
                 _logsToDelete.Add(StackdriverLogWriter.LogId);
                 StackdriverLogWriter.WriteLog("TestWithLogId test example");
@@ -144,10 +163,13 @@ namespace GoogleCloudSamples
                 });
             }
 
-            [Fact]
+            [Fact(Skip = "delete-log most often reports NotFound, even after 5 " +
+                "minutes or so.  The eventual consistency of the API is so " +
+                "long that it can't be tested in the limited time " +
+                "allotted to a unit test.")]
             public void TestDeleteLog()
             {
-                string logId = "logForTestDeleteLog";
+                string logId = "logForTestDeleteLog" + RandomName();
                 string message = "Example log entry.";
                 //Try creating a log entry
                 var created = Run("create-log-entry", logId, message);
@@ -156,16 +178,15 @@ namespace GoogleCloudSamples
                 Eventually(() =>
                 {
                     Run("delete-log", logId).AssertSucceeded();
-                    _logsToDelete.Remove(logId);
                 });
             }
 
             [Fact]
             public void TestCreateSink()
             {
-                string sinkId = "sinkForTestCreateSink";
-                string logId = "logForTestCreateSink";
-                SinkName sinkName = new SinkName(_projectId, sinkId);
+                string sinkId = "sinkForTestCreateSink" + RandomName();
+                string logId = "logForTestCreateSink" + RandomName();
+                LogSinkName sinkName = new LogSinkName(_projectId, sinkId);
                 string message = "Example log entry.";
                 _sinksToDelete.Add(sinkId);
                 _logsToDelete.Add(logId);
@@ -176,7 +197,7 @@ namespace GoogleCloudSamples
                 var created2 = Run("create-sink", sinkId, logId);
                 created2.AssertSucceeded();
                 var sinkClient = ConfigServiceV2Client.Create();
-                var results = sinkClient.GetSink(SinkNameOneof.From(sinkName));
+                var results = sinkClient.GetSink(sinkName);
                 // Confirm newly created sink is returned.
                 Assert.NotNull(results);
             }
@@ -184,8 +205,8 @@ namespace GoogleCloudSamples
             [Fact]
             public void TestListSinks()
             {
-                string sinkId = "sinkForTestListSinks";
-                string logId = "logForTestListSinks";
+                string sinkId = "sinkForTestListSinks" + RandomName();
+                string logId = "logForTestListSinks" + RandomName();
                 string sinkName = $"projects/{_projectId}/sinks/{sinkId}";
                 string message = "Example log entry.";
                 _logsToDelete.Add(logId);
@@ -200,18 +221,17 @@ namespace GoogleCloudSamples
                 {
                     // Try listing sinks.
                     var results = Run("list-sinks");
-                    // Confirm list-sinks results are not null.
-                    Assert.NotNull(results);
+                    Assert.Equal(0, results.ExitCode);
                 });
             }
 
             [Fact]
             public void TestUpdateSink()
             {
-                string sinkId = "sinkForTestUpdateSink";
-                string logId = "logForTestUpdateSink";
-                string newLogId = "newlogForTestUpdateSink";
-                SinkName sinkName = new SinkName(_projectId, sinkId);
+                string sinkId = "sinkForTestUpdateSink" + RandomName();
+                string logId = "logForTestUpdateSink" + RandomName();
+                string newLogId = "newlogForTestUpdateSink" + RandomName();
+                LogSinkName sinkName = new LogSinkName(_projectId, sinkId);
                 string message = "Example log entry.";
                 _sinksToDelete.Add(sinkId);
                 _logsToDelete.Add(logId);
@@ -224,7 +244,7 @@ namespace GoogleCloudSamples
                 Run("update-sink", sinkId, newLogId).AssertSucceeded();
                 // Get sink to confirm that log has been updated.
                 var sinkClient = ConfigServiceV2Client.Create();
-                var results = sinkClient.GetSink(SinkNameOneof.From(sinkName));
+                var results = sinkClient.GetSink(sinkName);
                 var currentLog = results.Filter;
                 Assert.Contains(newLogId, currentLog);
             }
@@ -232,10 +252,11 @@ namespace GoogleCloudSamples
             [Fact]
             public void TestDeleteSink()
             {
-                string sinkId = "sinkForTestDeleteSink";
-                string logId = "logForTestDeleteSink";
-                SinkName sinkName = new SinkName(_projectId, sinkId);
+                string sinkId = "sinkForTestDeleteSink" + RandomName();
+                string logId = "logForTestDeleteSink" + RandomName();
+                LogSinkName sinkName = new LogSinkName(_projectId, sinkId);
                 string message = "Example log entry.";
+                _sinksToDelete.Add(sinkId);
                 _logsToDelete.Add(logId);
                 // Try creating log with log entry.
                 Run("create-log-entry", logId, message).AssertSucceeded();
@@ -246,7 +267,7 @@ namespace GoogleCloudSamples
                 // Get sink to confirm it has been deleted.
                 var sinkClient = ConfigServiceV2Client.Create();
                 Exception ex = Assert.Throws<Grpc.Core.RpcException>(() =>
-                    sinkClient.GetSink(SinkNameOneof.From(sinkName)));
+                    sinkClient.GetSink(sinkName));
             }
 
             readonly CommandLineRunner _quickStart = new CommandLineRunner()

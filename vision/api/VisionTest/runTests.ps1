@@ -11,6 +11,8 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations under
 # the License.
+Import-Module ..\..\..\BuildTools.psm1
 
-dotnet restore
-dotnet test --test-adapter-path:. --logger:junit
+Set-TestTimeout 600
+
+dotnet test --test-adapter-path:. --logger:junit 2>&1 | %{ "$_" }

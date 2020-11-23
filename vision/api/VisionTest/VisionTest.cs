@@ -12,9 +12,12 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
+using Google.Cloud.Storage.V1;
+using Google.Cloud.Vision.V1;
+using System;
 using System.IO;
+using System.Linq;
 using Xunit;
-using System.Drawing;
 
 namespace GoogleCloudSamples
 {
@@ -63,7 +66,7 @@ namespace GoogleCloudSamples
         public static byte[] ToPngBytes(string imagePath)
         {
             var stream = new MemoryStream();
-            using (var image = Image.FromFile(imagePath))
+            using (var image = System.Drawing.Image.FromFile(imagePath))
                 image.Save(stream, System.Drawing.Imaging.ImageFormat.Png);
             var buffer = new byte[stream.Length];
             stream.Read(buffer, 0, buffer.Length);
@@ -107,7 +110,7 @@ namespace GoogleCloudSamples
         {
             var output = Run("labels", Path.Combine("data", "cat.jpg"));
             Assert.Equal(0, output.ExitCode);
-            Assert.Contains("mammal", output.Stdout);
+            Assert.Contains("cat", output.Stdout);
         }
 
         [Fact]
@@ -115,13 +118,21 @@ namespace GoogleCloudSamples
         {
             var output = Run("landmarks", Path.Combine("data", "tower.jpg"));
             Assert.Equal(0, output.ExitCode);
-            Assert.Contains("Eiffel", output.Stdout);
+            Assert.Matches(@".*(Eiffel|Mars).*", output.Stdout);
         }
 
         [Fact]
         public void DetectText()
         {
             var output = Run("text", Path.Combine("data", "bonito.gif"));
+            Assert.Equal(0, output.ExitCode);
+            Assert.Contains("fermented", output.Stdout);
+        }
+
+        [Fact]
+        public void DetectTextWithMultiRegion()
+        {
+            var output = Run("text", Path.Combine("data", "bonito.gif"), "-m");
             Assert.Equal(0, output.ExitCode);
             Assert.Contains("fermented", output.Stdout);
         }
@@ -139,7 +150,7 @@ namespace GoogleCloudSamples
         {
             var output = Run("text", Path.Combine("data", "logo.jpg"));
             Assert.Equal(0, output.ExitCode);
-            Assert.Contains("Google", output.Stdout);
+            Assert.Contains("google", output.Stdout.ToLower());
         }
 
         [Fact]
@@ -195,6 +206,16 @@ namespace GoogleCloudSamples
             Assert.Contains("\tX:", output.Stdout);
             Assert.Contains("\tY:", output.Stdout);
         }
+
+        [Fact]
+        public void DetectObjectLocalization()
+        {
+            // TODO(erschmid): Replace with 'puppies.jpg' after merge.
+            var output = Run("object-localization",
+                             Path.Combine("data", "tower.jpg"));
+            Assert.Contains("Building", output.Stdout);
+            Assert.Equal(0, output.ExitCode);
+        }
     }
 
     /// <summary>
@@ -242,6 +263,36 @@ namespace GoogleCloudSamples
                 return _detect.Run(cmdArgs);
             }
         }
+
+        [Fact]
+        public void DetectPdfDocument()
+        {
+            var _pdfFileName = "HodgeConj.pdf";
+            var outputPrefix = "";
+            var localPath = Path.Combine("data", _pdfFileName);
+            var gcsSourceURI = $"gs://{_bucketName}/{_pdfFileName}";
+            ConsoleOutput output;
+
+            string[] cmdArgs = { "ocr", gcsSourceURI, _bucketName, outputPrefix };
+
+            using (var collector = new BucketCollector(_bucketName))
+            {
+                collector.CopyToBucket(localPath, _pdfFileName);
+                output = _detect.Run(cmdArgs);
+
+                Assert.Equal(0, output.ExitCode);
+                Assert.Contains("Full text:", output.Stdout);
+                Assert.Contains("Hodge conjecture", output.Stdout);
+            }
+
+            // Clean up output files.
+            var storageClient = StorageClient.Create();
+            var blobList = storageClient.ListObjects(_bucketName, "");
+            foreach (var outputFile in blobList.Where(x => x.Name.Contains(".json")).Select(x => x.Name))
+            {
+                storageClient.DeleteObject(_bucketName, outputFile);
+            }
+        }
     }
 
     /// <summary>
@@ -249,6 +300,18 @@ namespace GoogleCloudSamples
     /// </summary>
     public class PublicUriTests : CommonTests
     {
+        readonly RetryRobot _retryRobot = new RetryRobot()
+        {
+            ShouldRetry = (Exception e) =>
+            {
+                // Sometimes the API is not able to access the URL.
+                // Is github throttling us?
+                var annotateImageException = e as AnnotateImageException;
+                return annotateImageException != null &&
+                    annotateImageException.Message.Contains("URL");
+            }
+        };
+
         readonly CommandLineRunner _detect = new CommandLineRunner()
         {
             VoidMain = DetectProgram.Main,
@@ -263,7 +326,8 @@ namespace GoogleCloudSamples
                 "dotnet-docs-samples/master/vision/api/VisionTest/data/";
             string filePublicUri =
                 uriPrefix + uriSampleFilePath + Path.GetFileName(args[1]);
-            return _detect.Run(args[0], filePublicUri);
+            return _retryRobot.Eventually(
+                () => _detect.Run(args[0], filePublicUri));
         }
     }
 
@@ -283,7 +347,7 @@ namespace GoogleCloudSamples
         {
             var output = _quickStart.Run();
             Assert.Equal(0, output.ExitCode);
-            Assert.Contains("mammal", output.Stdout);
+            Assert.Contains("cat", output.Stdout);
         }
     }
 }

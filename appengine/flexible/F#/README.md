@@ -8,12 +8,13 @@ to check whether an image contains naughty content.
 
 ## Prerequisites
 
-1.  **Follow the instructions in the [root README](../../../README.md).**
+1.  **Follow the set-up instructions in [the documentation](https://cloud.google.com/dotnet/docs/setup).**
   
 2.  Install the [Google Cloud SDK](https://cloud.google.com/sdk/).  The Google Cloud SDK
     is required to deploy .NET applications to App Engine.
 
-3.  Install the [.NET Core SDK, version 1.1](https://github.com/dotnet/core/blob/master/release-notes/download-archives/1.1.4-download.md).
+3.  Install the [.NET Core SDK, version 1.1](https://github.com/dotnet/core/blob/master/release-notes/download-archives/1.1.4-download.md)
+    or newer.
 
 4.  Visit [fsharp.org](http://fsharp.org/) and download F# for your system.
 

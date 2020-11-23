@@ -42,7 +42,7 @@ namespace GoogleCloudSamples
             public string LanguageCode { get; set; }
         }
 
-        // [START dialogflow_detect_intent_texts]
+        // [START dialogflow_detect_intent_text]
         public static int DetectIntentFromTexts(string projectId,
                                                 string sessionId,
                                                 string[] texts,
@@ -53,7 +53,7 @@ namespace GoogleCloudSamples
             foreach (var text in texts)
             {
                 var response = client.DetectIntent(
-                    session: new SessionName(projectId, sessionId),
+                    session: SessionName.FromProjectSession(projectId, sessionId),
                     queryInput: new QueryInput()
                     {
                         Text = new TextInput()
@@ -67,7 +67,10 @@ namespace GoogleCloudSamples
                 var queryResult = response.QueryResult;
 
                 Console.WriteLine($"Query text: {queryResult.QueryText}");
-                Console.WriteLine($"Intent detected: {queryResult.Intent.DisplayName}");
+                if (queryResult.Intent != null)
+                {
+                    Console.WriteLine($"Intent detected: {queryResult.Intent.DisplayName}");
+                }
                 Console.WriteLine($"Intent confidence: {queryResult.IntentDetectionConfidence}");
                 Console.WriteLine($"Fulfillment text: {queryResult.FulfillmentText}");
                 Console.WriteLine();
@@ -75,6 +78,6 @@ namespace GoogleCloudSamples
 
             return 0;
         }
-        // [END dialogflow_detect_intent_texts]
+        // [END dialogflow_detect_intent_text]
     }
 }

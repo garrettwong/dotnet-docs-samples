@@ -37,6 +37,24 @@ namespace GoogleCloudSamples
         }
     }
 
+    public class TranscribeContextClassesTests
+    {
+        private static readonly string s_AUDIO_FILE = "gs://cloud-samples-data/speech/commercial_mono.wav";
+        readonly CommandLineRunner _transcribeContextClasess = new CommandLineRunner()
+        {
+            VoidMain = TranscribeContext.Main,
+            Command = "Transcribe Context Classes"
+        };
+
+        [Fact]
+        public void TestTranscribeContext()
+        {
+            var output = _transcribeContextClasess.Run(s_AUDIO_FILE);
+            Assert.Equal(0, output.ExitCode);
+            Assert.Contains("Transcript:", output.Stdout);
+        }
+    }
+
     public abstract class CommonRecognizeTests
     {
         protected readonly CommandLineRunner _recognize = new CommandLineRunner()
@@ -54,6 +72,8 @@ namespace GoogleCloudSamples
 
         protected string _audioRawPath = Path.Combine("resources", "audio.raw");
         protected string _audioFlacPath = Path.Combine("resources", "audio.flac");
+        protected string _audioWavPath = Path.Combine("resources", "commercial_mono.wav");
+        protected string _audioSteroPath = Path.Combine("resources", "commercial_stereo.wav");
 
         [Fact]
         public void TestSync()
@@ -81,10 +101,14 @@ namespace GoogleCloudSamples
         public void TestListen()
         {
             var output = _recognize.Run("listen", "3");
-            if (0 == output.ExitCode)
+            if (output.ExitCode == 0)
+            {
                 Assert.Contains("Speak now.", output.Stdout);
+            }
             else
+            {
                 Assert.Contains("No microphone.", output.Stdout);
+            }
         }
 
         [Fact]
@@ -120,6 +144,55 @@ namespace GoogleCloudSamples
             Assert.Equal(0, output.ExitCode);
             Assert.Contains("Brooklyn", output.Stdout);
             Assert.Contains("WordStartTime:", output.Stdout);
+        }
+
+        [Fact]
+        public void TestSyncPunctuation()
+        {
+            var output = Run("sync", "-p", _audioWavPath);
+            Assert.Equal(0, output.ExitCode);
+            Assert.Contains("Terrific. It's on the way.", output.Stdout);
+        }
+
+        [Fact]
+        public void TestSyncModelSelection()
+        {
+            var output = Run("sync", "-m", "command_and_search", _audioRawPath);
+            Assert.Equal(0, output.ExitCode);
+            Assert.Contains("Brooklyn", output.Stdout);
+        }
+
+        [Fact]
+
+        public void TestSyncEnhancedModel()
+        {
+            var output = Run("sync", "-e", _audioWavPath);
+            Assert.Equal(0, output.ExitCode);
+            Assert.Contains("Chromecast", output.Stdout);
+        }
+
+        [Fact]
+        public void TestSyncMultiChannel()
+        {
+            var output = Run("sync", "-c", "2", _audioSteroPath);
+            Assert.Equal(0, output.ExitCode);
+            Assert.Contains("Channel Tag: 2", output.Stdout);
+        }
+
+        [Fact]
+        public void TestSyncMultiSpeaker()
+        {
+            var output = Run("sync", "-s", "2", _audioWavPath);
+            Assert.Equal(0, output.ExitCode);
+            Assert.Contains("Speaker: 1", output.Stdout);
+        }
+
+        [Fact]
+        public void TestSyncRecognitionMetadata()
+        {
+            var output = Run("sync", "-r", _audioFlacPath);
+            Assert.Equal(0, output.ExitCode);
+            Assert.Contains("Brooklyn", output.Stdout);
         }
     }
 

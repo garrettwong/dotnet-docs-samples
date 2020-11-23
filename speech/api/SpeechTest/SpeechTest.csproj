@@ -1,16 +1,18 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Library</OutputType>
-    <TargetFramework>netcoreapp2.0</TargetFramework>
+    <TargetFramework>netcoreapp2.1</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Google.Cloud.Speech.V1" Version="1.0.0" />
-    <PackageReference Include="JUnitTestLogger" Version="0.6.0" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.3.0" />
-    <PackageReference Include="xunit" Version="2.3.0" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="2.3.0" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.4.1">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="JUnitTestLogger" Version="1.1.0" />  
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.5.0" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\TranscribeContext\TranscribeContextClasses.csproj" />
     <ProjectReference Include="..\Recognize\Recognize.csproj" />
     <ProjectReference Include="..\QuickStart\QuickStart.csproj" />
     <ProjectReference Include="..\..\..\testutil\testutil.csproj" />
@@ -33,5 +35,13 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
-
+  <ItemGroup>
+    <None Update="resources\commercial_mono.wav">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="resources\commercial_stereo.wav">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <LogicalName>SpeechTest.resources.commercial_stereo.wav</LogicalName>
+    </None>
+  </ItemGroup>
 </Project>

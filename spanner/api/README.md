@@ -12,14 +12,19 @@ can use [this older sample](
 
 ## Build and Run
 
-1.  **Follow the instructions in the [root README](../../README.md)**.
+1.  **Follow the set-up instructions in [the documentation](https://cloud.google.com/dotnet/docs/setup).**
 
 4.  Enable APIs for your project.
     [Click here](https://console.cloud.google.com/flows/enableapi?apiid=spanner.googleapis.com&showconfirmation=true)
     to visit Cloud Platform Console and enable the Google Cloud Spanner API.
 
+5.  In the [Cloud Console](https://console.cloud.google.com/spanner/), create a Cloud Spanner
+    instance and then create a database on that instance.
+
 7.  Edit `QuickStart\Program.cs`, and replace YOUR-PROJECT-ID with id
-    of the project you created in step 1.
+    of the project you created in step 1. Also, update "my-instance"
+    and "my-database" with the id's of the instance and database you
+    created in step 3.
 
 9.  From a Powershell command line, run the QuickStart sample:
     ```
@@ -30,67 +35,125 @@ can use [this older sample](
 10. And run the Spanner sample to see a list of subcommands:
     ```
     PS C:\...\dotnet-docs-samples\spanner\api\Spanner> dotnet run
-    Spanner 1.0.0.0
-    Copyright c  2017
+    Spanner 1.0.0
+    Copyright (C) 2018 Spanner
 
     ERROR(S):
       No verb selected.
 
-      createSampleDatabase         Create a sample Cloud Spanner database along with sample tables in your project.
+      createSampleDatabase              Create a sample Cloud Spanner database along with sample tables in your project.
 
-      createDatabase               Create a Cloud Spanner database in your project.
+      createDatabase                    Create a Cloud Spanner database in your project.
 
-      deleteSampleData             Delete sample data from sample Cloud Spanner database table.
+      deleteSampleData                  Delete sample data from sample Cloud Spanner database table.
 
-      insertSampleData             Insert sample data into sample Cloud Spanner database table.
+      insertSampleData                  Insert sample data into sample Cloud Spanner database table.
 
-      querySampleData              Query sample data from sample Cloud Spanner database table.
+      querySampleData                   Query sample data from sample Cloud Spanner database table.
 
-      addColumn                    Add a column to the sample Cloud Spanner database table.
+      addColumn                         Add a column to the sample Cloud Spanner database table.
 
-      writeDataToNewColumn         Write data to a newly added column in the sample Cloud Spanner database table.
+      writeDataToNewColumn              Write data to a newly added column in the sample Cloud Spanner database table.
 
-      queryNewColumn               Query data from a newly added column in the sample Cloud Spanner database table.
+      queryNewColumn                    Query data from a newly added column in the sample Cloud Spanner database table.
 
-      queryDataWithTransaction     Query the sample Cloud Spanner database table using a transaction.
+      queryDataWithTransaction          Query the sample Cloud Spanner database table using a transaction.
 
-      readWriteWithTransaction     Update data in the sample Cloud Spanner database table using a read-write transaction.
+      readWriteWithTransaction          Update data in the sample Cloud Spanner database table using a read-write transaction.
 
-      addIndex                     Add an index to the sample Cloud Spanner database table.
+      addIndex                          Add an index to the sample Cloud Spanner database table.
 
-      addStoringIndex              Add a storing index to the sample Cloud Spanner database table.
+      addStoringIndex                   Add a storing index to the sample Cloud Spanner database table.
 
-      queryDataWithIndex           Query the sample Cloud Spanner database table using an index.
+      queryDataWithIndex                Query the sample Cloud Spanner database table using an index.
 
-      queryDataWithStoringIndex    Query the sample Cloud Spanner database table using an storing index.
+      queryDataWithStoringIndex         Query the sample Cloud Spanner database table using an storing index.
 
-      readStaleData                Read data that is ten seconds old.
+      readStaleData                     Read data that is ten seconds old.
 
-      batchInsertRecords           Batch insert sample records into the database.
+      insertStructSampleData            Insert sample data that can be queried using Spanner structs.
 
-      batchReadRecords             Batch read sample records from the database.
+      queryDataWithStruct               Query sample data in the sample Cloud Spanner database table using a Spanner struct.
 
-      addCommitTimestamp            Add a commit timestamp column to the sample Cloud Spanner database table.
+      queryDataWithArrayOfStruct        Query sample data in the sample Cloud Spanner database table using an array of Spanner structs.
 
-      updateDataWithTimestamp       Update data with a newly added commit timestamp column in the sample Cloud Spanner database table.
+      queryDataWithStructField          Query data sample data in the sample Cloud Spanner database table using a field in a Spanner struct.
 
-      queryDataWithTimestamp        Query data with a newly added commit timestamp column in the sample Cloud Spanner database table.
+      queryDataWithNestedStructField    Query data sample data in the sample Cloud Spanner database table using a field in a nested Spanner struct.
 
-      createTableWithTimestamp      Create a new table with a commit timestamp column in the sample Cloud Spanner database table.
+      batchInsertRecords                Batch insert sample records into the database.
 
-      writeDataWithTimestamp        Write data into table with a commit timestamp column in the sample Cloud Spanner database table.
+      batchReadRecords                  Batch read sample records from the database.
 
-      queryNewTableWithTimestamp    Query data from table with a commit timestamp column in the sample Cloud Spanner database table.
+      addCommitTimestamp                Add a commit timestamp column to the sample Cloud Spanner database table.
 
-      listDatabaseTables           List all the user-defined tables in the database.
+      updateDataWithTimestamp           Update data with a newly added commit timestamp column in the sample Cloud Spanner database table.
 
-      deleteDatabase               Delete a Spanner database.
+      queryDataWithTimestamp            Query data with a newly added commit timestamp column in the sample Cloud Spanner database table.
 
-      dropSampleTables             Drops the tables created by createSampleDatabase.
+      createTableWithTimestamp          Create a new table with a commit timestamp column in the sample Cloud Spanner database table.
 
-      help                         Display more information on a specific command.
+      writeDataWithTimestamp            Write data into table with a commit timestamp column in the sample Cloud Spanner database table.
 
-      version                      Display version information.
+      queryNewTableWithTimestamp        Query data from table with a commit timestamp column in the sample Cloud Spanner database table.
+
+      querySingersTable                 Query data from the sample 'Singers' Cloud Spanner database table.
+
+      queryAlbumsTable                  Query data from the sample 'Albums' Cloud Spanner database table.
+
+      insertUsingDml                    Insert data using a DML statement.
+
+      updateUsingDml                    Update data using a DML statement.
+
+      deleteUsingDml                    Delete data using a DML statement.
+
+      updateUsingDmlWithTimestamp       Update the timestamp value of specifc records using a DML statement.
+
+      writeAndReadUsingDml              Insert data using a DML statement and then read the inserted data.
+
+      updateUsingDmlWithStruct          Update data using a DML statement combined with a Spanner struct.
+
+      writeUsingDml                     Insert multiple records using a DML statement.
+
+      queryWithParameter                Query record inserted using DML with a query parameter.
+
+      writeWithTransactionUsingDml      Update data using a DML statement within a read-write transaction.
+
+      updateUsingPartitionedDml         Update multiple records using a partitioned DML statement.
+
+      deleteUsingPartitionedDml         Delete multiple records using a partitioned DML statement.
+
+      updateUsingBatchDml               Updates sample data in the database using Batch DML.
+
+      createTableWithDatatypes          Create 'Venues' table containing supported datatype columns.
+
+      writeDatatypesData                Write data into 'Venues' table.
+
+      queryWithArray                    Query ARRAY datatype from the 'Venues' table.
+
+      queryWithBool                     Query BOOL datatype from the 'Venues' table.
+
+      queryWithBytes                    Query BYTES datatype from the Venues' table.
+
+      queryWithDate                     Query DATE datatype from the 'Venues' table.
+
+      queryWithFloat                    Query FLOAT64 datatype from the 'Venues' table.
+
+      queryWithInt                      Query INT64 datatype from the 'Venues' table.
+
+      queryWithString                   Query STRING datatype from the 'Venues' table.
+
+      queryWithTimestamp                Query TIMESTAMP datatype from the 'Venues' table.
+
+      listDatabaseTables                List all the user-defined tables in the database.
+
+      deleteDatabase                    Delete a Spanner database.
+
+      dropSampleTables                  Drops the tables created by createSampleDatabase.
+
+      help                              Display more information on a specific command.
+
+      version                           Display version information.
     ```
 
     ```

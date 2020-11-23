@@ -13,85 +13,6 @@
 # the License.
 
 ##############################################################################
-# HOW TO USE THE FUNCTIONS IN THIS MODULE
-##############################################################################
-<#
-
-PS ...> Import-Module .\BuildTools.psm1
-WARNING: The names of some imported commands from the module 'BuildTools' include unapproved verbs that might make them less
-discoverable. To find the commands with unapproved verbs, run the Import-Module command again with the Verbose parameter. For
- a list of approved verbs, type Get-Verb.
-PS ...> cd .\aspnet\2-structured-data
-PS ...\aspnet\2-structured-data> Run-TestScripts
-...
-0 SUCCEEDED
-2 FAILED
-.\runTestsWithDatastore.ps1
-.\runTestsWithSql.ps1
-
-# Oh no!  My tests failed.  I forgot to update the Web.Configs from my
-# environment variables.
-PS ...\aspnet\2-structured-data> Update-Config
-.\Web.config is modified.  Overwrite? [Y]es, [N]o, Yes to [A]ll: a
-C:\Users\Jeffrey Rennie\gitrepos\getting-started-dotnet\aspnet\2-structured-data\Web.config
-C:\Users\Jeffrey Rennie\gitrepos\getting-started-dotnet\aspnet\2-structured-data\Views\Web.config
-
-# And run the tests again.
-PS ...\aspnet\2-structured-data> Run-TestScripts
-...
-2 SUCCEEDED
-.\runTestsWithDatastore.ps1
-.\runTestsWithSql.ps1
-0 FAILED
-
-# Yay!  They succeeded.
-# I can also just run any test script directly:
-PS ...\aspnet\2-structured-data> .\runTestsWithDatastore.ps1
-...
-PASS 4 tests executed in 10.671s, 4 passed, 0 failed.
-
-# Or, I can run the test and leave IISExpress running to debug:
-PS ...\aspnet\2-structured-data> Set-BookStore mysql
-PS ...\aspnet\2-structured-data> Run-IISExpressTest -LeaveRunning
-
-# Don't submit the changes to Web.configs.
-PS ...\aspnet\2-structured-data> Unstage-Config
-Unstaged changes after reset:
-M	aspnet/2-structured-data/Views/Web.config
-M	aspnet/2-structured-data/Web.config
-
-# Submit my changes.
-PS ...\aspnet\2-structured-data>git commit
-
-# Clean up, cause I'm done.
-PS ...\aspnet\2-structured-data> Revert-Config
-
-#>
-
-##############################################################################
-#.SYNOPSIS
-# Adds a setting to a Web.config configuration.
-#
-#.PARAMETER Config
-# The root xml object from a Web.config or App.config file.
-#
-#.PARAMETER Key
-# The name of the key to set.
-#
-#.PARAMETER Value
-# The value to set.
-#
-#.EXAMPLE
-# Add-Setting $config 'GoogleCloudSamples:ProjectId' $env:GoogleCloudSamples:ProjectId
-##############################################################################
-function Add-Setting($Config, [string]$Key, [string]$Value) {
-    $x = Select-Xml -Xml $Config.Node -XPath "appSettings/add[@key='$Key']"
-    if ($x) {
-        $x.Node.value = $Value
-    }
-}
-
-##############################################################################
 #.SYNOPSIS
 # Logical operator.
 #
@@ -114,128 +35,13 @@ function When-Empty($Target, $ArgList, [ScriptBlock]$ScriptBlock) {
 
 ##############################################################################
 #.SYNOPSIS
-# Finds all the Web.config files in subdirectories.
-#
-##############################################################################
-filter Get-Config ($Target, $ArgList, $Mask="Web.config") {
-    $paths = When-Empty $Target $ArgList {Find-Files -Masks $Mask}
-    if ($paths) {
-        $paths | Resolve-Path -Relative
-    }
-}
-
-##############################################################################
-#.SYNOPSIS
-# Updates Web.config files, pulling values from environment variables.
-#
-#.DESCRIPTION
-# Asks the user before overwriting files that have already been modified.
-# Don't forget to Revert-Config or Unstage-Config before 'git commit'ing!
-#
-#.PARAMETER Yes
-# Never ask the user if they want to overwrite a modified Web.config.  Just
-# overwrite it.
-#
-#.INPUTS
-# Paths to Web.config.  If empty, recursively searches directories for
-# Web.config files.
-#
-#.OUTPUTs
-# Paths to Web.configs that this function modified.
-#
-#.EXAMPLE
-# Update-Config
-##############################################################################
-filter Update-Config ([switch]$Yes) {
-    $configs = Get-Config $_ $args
-    foreach($configPath in $configs) {
-        if (-not $Yes -and (git status -s $configPath)) {
-            do {
-                $reply = Read-Host "$configPath is modified.  Overwrite? [Y]es, [N]o, Yes to [A]ll"
-            } until ("y", "n", "a" -contains $reply)
-            if ("n" -eq $reply) { continue }
-            if ("a" -eq $reply) { $Yes = $true }
-        }
-        $config = Select-Xml -Path $configPath -XPath configuration
-        if (-not $config) {
-            continue;
-        }
-        Add-Setting $config 'GoogleCloudSamples:BookStore' $env:GoogleCloudSamples:BookStore
-        Add-Setting $config 'GoogleCloudSamples:ProjectId' $env:GoogleCloudSamples:ProjectId
-        Add-Setting $config 'GoogleCloudSamples:BucketName' $env:GoogleCloudSamples:BucketName
-        Add-Setting $config 'GoogleCloudSamples:AuthClientId' $env:GoogleCloudSamples:AuthClientId
-        Add-Setting $config 'GoogleCloudSamples:AuthClientSecret' $env:GoogleCloudSamples:AuthClientSecret
-        $connectionString = Select-Xml -Xml $config.Node -XPath "connectionStrings/add[@name='LocalMySqlServer']"
-        if ($connectionString) {
-            if ($env:GoogleCloudSamples:ConnectionString) {
-                $connectionString.Node.connectionString = $env:GoogleCloudSamples:ConnectionString;
-            } elseif ($env:Data:MySql:ConnectionString) {
-                # TODO: Stop checking this old environment variable name when we've
-                # updated all the scripts.
-                $connectionString.Node.connectionString = $env:Data:MySql:ConnectionString;
-            }
-        }
-        $config.Node.OwnerDocument.Save($config.Path);
-        $config.Path
-    }
-}
-
-##############################################################################
-#.SYNOPSIS
-# Updates Web.config files.  Sets the BookStore setting.
-#
-#.INPUTS
-# Paths to Web.config.  If empty, recursively searches directories for
-# Web.config files.
-#
-#.EXAMPLE
-# Set-BookStore mysql
-##############################################################################
-filter Set-BookStore($BookStore) {
-    $configs = Get-Config $_ $args
-    foreach($configPath in $configs) {
-        $config = Select-Xml -Path $configPath -XPath configuration
-        Add-Setting $config 'GoogleCloudSamples:BookStore' $BookStore
-        $config.Node.OwnerDocument.Save($config.Path)
-    }
-}
-
-##############################################################################
-#.SYNOPSIS
-# Reverts Web.config files.
-#
-#.DESCRIPTION
-# git must be in the current PATH.
-#
-#.INPUTS
-# Paths to Web.config.  If empty, recursively searches directories for
-# Web.config files.
-##############################################################################
-filter Revert-Config {
-    $configs = Get-Config $_ $args
-    $silent = git reset HEAD $configs
-    git checkout -- $configs
-}
-
-##############################################################################
-#.SYNOPSIS
-# Unstages Web.config files.
-#
-#.DESCRIPTION
-# git must be in the current PATH.
-#
-#.INPUTS
-# Paths to Web.config.  If empty, recursively searches directories for
-# Web.config files.
-##############################################################################
-filter Unstage-Config {
-    $configs = Get-Config $_ $args
-    git reset HEAD $configs
-}
-
-##############################################################################
-#.SYNOPSIS
 # Recursively find all the files that match a mask.
+#
+#.DESCRIPTION
+# Why not simply cal Get-ChildItem -Recurse ...?
+# Traversing the many directories that are full of junk we're not interested
+# can take a long time.  Unlike Get-ChildItem, this function does not
+# traverse directories that match the AntiMasks.
 #
 #.PARAMETER Path
 # Start searching from where?  Defaults to the current directory.
@@ -446,6 +252,10 @@ function Run-TestScriptsOnce([array]$Scripts, [int]$TimeoutSeconds,
     [string]$Verb, [hashtable]$Results)
 {
     foreach ($script in $Scripts) {
+        # Fork a job for each script for a couple reasons:
+        # 1. If it runs beyond its timeout, we can kill it and move on.
+        # 2. We can tee its output to a separate file, and dump it into an
+        #    XML failure report if it fails.
         $startDate = Get-Date
         $relativePath = Resolve-Path -Relative $script
         $jobState = 'Failed'
@@ -453,7 +263,7 @@ function Run-TestScriptsOnce([array]$Scripts, [int]$TimeoutSeconds,
         Write-Output "$verb $relativePath..."
         $job = Start-Job -ArgumentList $relativePath, $script.Directory, `
             ('.\"{0}"' -f $script.Name) {
-            $ErrorActionPreference = "Stop"
+            $ErrorActionPreference = "Continue"
             Write-Output ("-" * 79)
             Write-Output $args[0]
             Set-Location $args[1]
@@ -492,7 +302,6 @@ function Run-TestScriptsOnce([array]$Scripts, [int]$TimeoutSeconds,
                 break
             }
         }
-        Remove-Job -Force $job
         $results[$jobState] += @($relativePath)
         # If the script left no TestResults.xml, create one.
         $parentDir = (Get-Item $script).Directory
@@ -501,9 +310,12 @@ function Run-TestScriptsOnce([array]$Scripts, [int]$TimeoutSeconds,
             if ($jobState -eq 'Skipped') {
                 Write-SkippedXml $script $elapsed
             } else {
+                $job.ChildJobs[0].JobStateInfo.Reason.Message | Out-File -Append -FilePath $tempOut
+                $job.ChildJobs[0].Error | Out-File -Append -FilePath $tempOut
                 Write-FailureXml $script (Get-Content $tempOut) $elapsed -timedOut:($jobState -eq 'Timed Out')
             }
         }
+        Remove-Job -Force $job
     }
 }
 
@@ -525,15 +337,6 @@ function Run-TestScripts($TimeoutSeconds=300) {
     Run-TestScriptsOnce $scripts $TimeoutSeconds 'Starting' $results
     # Rename all the test logs to a name Sponge will find.
     Get-ChildItem -Recurse TestResults.xml | Rename-Item -Force -NewName 01_sponge_log.xml
-    # Retry the failures once.
-    $failed = $results['Failed']
-    if ($failed) {
-        $results['Failed'] = @()
-        Run-TestScriptsOnce ($failed | Get-Item) $TimeoutSeconds `
-            'Retrying' $results
-        # Rename all the test logs to a name Sponge will find.
-        Get-ChildItem -Recurse TestResults.xml | Rename-Item -Force -NewName 02_sponge_log.xml
-    }
 
     # Print a final summary.
     Write-Output ("=" * 79)
@@ -649,7 +452,7 @@ function Convert-2003ProjectToCore($csproj) {
 # Lint-Project
 ##############################################################################
 filter Lint-Code {
-    $projects = When-Empty $_ $args { Find-Files -Masks *.csproj }
+<#     $projects = When-Empty $_ $args { Find-Files -Masks *.csproj }
     foreach ($project in $projects) {
         @($project) | Format-Code
         # If git reports a diff, codeformatter changed something, and that's bad.
@@ -663,7 +466,7 @@ filter Lint-Code {
     if ($utf16) {
         $utf16
         throw "Found UTF-16 encoded source files. Run Find-Utf16 | ConvertTo-Utf8 to fix."
-    }
+    } #>
 }
 
 ##############################################################################
@@ -799,7 +602,7 @@ function Run-Kestrel([Parameter(mandatory=$true)][string]$url)
             throw "Kestrel failed to start."
         }
         foreach ($line in $lines) {
-            if ($line -like 'Application started.*') {
+            if ($line.contains('Application started')) {
                 return $kestrelJob
             }
         }
@@ -927,72 +730,6 @@ function Deploy-CasperJsTest($testJs ='test.js') {
     }
 }
 
-##############################################################################
-#.SYNOPSIS
-# Migrate the database.
-#
-#.DESCRIPTION
-# Must be called from a directory with a .csproj and Web.config.
-#
-#.PARAMETER DllName
-# The name of the built binary.  Defaults to the current directory name.
-##############################################################################
-function Migrate-Database($DllName = '') {
-    if (!$DllName) {
-        # Default to the name of the current directory + .dll
-        # For example, if the current directory is 3-binary-data, then the
-        # dll name will be 3-binary-data.dll.
-        $DllName =  (get-item .).Name + ".dll"
-    }
-    # Migrate.exe cannot be run in place.  It must be copied to the bin directory
-    # and run from there.
-    cp (Join-Path (UpFind-File packages) EntityFramework.*\tools\migrate.exe) bin\.
-    $originalDir = pwd
-    Try {
-        cd bin
-        .\migrate.exe $dllName /startupConfigurationFile="..\Web.config"
-        if ($LASTEXITCODE) {
-            throw "migrate.exe failed with error code $LASTEXITCODE"
-        }
-    }
-    Finally {
-        cd $originalDir
-    }
-}
-
-##############################################################################
-#.SYNOPSIS
-# Calls nuget update on all the packages that match the mask.
-#
-#.PARAMETER Mask
-# Which packages should be updated?
-#
-#.INPUTS
-# Paths to .sln files.  If empty, recursively searches directories for
-# *.sln files.
-#
-#.EXAMPLE
-# Update-Packages Google.*
-##############################################################################
-filter Update-Packages ([string] $Mask) {
-    $solutions = When-Empty $_ $args { Find-Files -Masks *.sln }
-    foreach ($solution in $solutions) {
-        # Nuget refuses to update without calling restore first.
-        nuget restore $solution
-        # Assume all packages.configs in the same directory, or a subdirectory
-        # as the solution are for projects in the solution.
-        $packageConfigs = Find-Files (Get-Item $solution).Directory -Masks packages.config
-        # Inspect each packages.config and find matching Ids.
-        $packageIds = $packageConfigs `
-            | ForEach-Object {(Select-Xml -Path $_ -XPath packages/package).Node.Id} `
-            | Where {$_ -like $Mask}
-        # Calling nuget update with no packageIds means update *all* packages,
-        # and that's definitely not what we want.
-        if ($packageIds) {
-            nuget update -Prerelease $solution ($packageIds | ForEach-Object {"-Id", $_})
-        }
-    }
-}
 
 ##############################################################################
 #.SYNOPSIS
@@ -1246,4 +983,30 @@ function Add-Copyright([string[]][Parameter(ValueFromPipeline=$true)] $Files)
         Move-Item -Force $tempPath $path
         "Add copyright to $path."
     }
+}
+
+<#
+.SYNOPSIS
+Generate a new random name that can be used to name GCP objects.
+
+.PARAMETER Prefix
+An optional prefix for the random name.
+
+.PARAMETER Length
+The number of random characters to be included in the name.
+
+.PARAMETER CharSet
+The set of characters from which the random name is generated.
+
+.EXAMPLE
+> New-RandomName
+hpywzrkcjuebdgsqvatx
+#>
+
+function New-RandomName([string]$Prefix = '', [int]$Length = 20, 
+    [string]$CharSet = 'abcdefghijklmnopqrstuvwxyz') 
+{
+    $randomChars = $CharSet.ToCharArray() | Get-Random -Count $Length
+    $randomString = $randomChars -join ''
+    return "$Prefix$randomString"
 }

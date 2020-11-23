@@ -12,5 +12,5 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-dotnet restore
-dotnet test --test-adapter-path:. --logger:junit
+# See: https://github.com/GoogleCloudPlatform/dotnet-docs-samples/issues/1059
+# dotnet test --test-adapter-path:. --logger:junit 2>&1 | %{ "$_" }

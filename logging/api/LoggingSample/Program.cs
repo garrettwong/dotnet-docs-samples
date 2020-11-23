@@ -15,13 +15,15 @@
  */
 // [START complete]
 
-using Google.Cloud.Logging.V2;
+using Google.Api;
+using Google.Api.Gax.Grpc;
+using Google.Api.Gax.ResourceNames;
 using Google.Cloud.Logging.Type;
+using Google.Cloud.Logging.V2;
+using Grpc.Core;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Google.Api;
-using Google.Api.Gax.Grpc;
 
 namespace GoogleCloudSamples
 {
@@ -39,15 +41,13 @@ namespace GoogleCloudSamples
                 "  dotnet run delete-log log-id\n" +
                 "  dotnet run delete-sink sink-id \n";
 
-        private readonly CallSettings _retryAWhile =
-            CallSettings.FromCallTiming(CallTiming.FromRetry(new RetrySettings(
-                    new BackoffSettings(TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(12), 2.0),
-                    new BackoffSettings(TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(120)),
-                    Google.Api.Gax.Expiration.FromTimeout(TimeSpan.FromSeconds(180)),
-                    (Grpc.Core.RpcException e) =>
-                    new[] { Grpc.Core.StatusCode.Internal,
-                        Grpc.Core.StatusCode.DeadlineExceeded }
-                        .Contains(e.Status.StatusCode))));
+        private readonly CallSettings _retryAWhile = CallSettings.FromRetry(
+            RetrySettings.FromExponentialBackoff(
+                maxAttempts: 15,
+                initialBackoff: TimeSpan.FromSeconds(3),
+                maxBackoff: TimeSpan.FromSeconds(12),
+                backoffMultiplier: 2.0,
+                retryFilter: RetrySettings.FilterForStatusCodes(StatusCode.Internal, StatusCode.DeadlineExceeded)));
 
         public bool PrintUsage()
         {
@@ -67,14 +67,14 @@ namespace GoogleCloudSamples
             return loggingSample.Run(args);
         }
 
-        // [START write_log_entry]
+        // [START logging_write_log_entry]
         private void WriteLogEntry(string logId, string message)
         {
             var client = LoggingServiceV2Client.Create();
             LogName logName = new LogName(s_projectId, logId);
             LogEntry logEntry = new LogEntry
             {
-                LogName = logName.ToString(),
+                LogNameAsLogName = logName,
                 Severity = LogSeverity.Info,
                 TextPayload = $"{typeof(LoggingSample).FullName} - {message}"
             };
@@ -84,29 +84,28 @@ namespace GoogleCloudSamples
                 { "size", "large" },
                 { "color", "red" }
             };
-            client.WriteLogEntries(LogNameOneof.From(logName), resource, entryLabels,
+            client.WriteLogEntries(logName, resource, entryLabels,
                 new[] { logEntry }, _retryAWhile);
             Console.WriteLine($"Created log entry in log-id: {logId}.");
         }
-        // [END write_log_entry]
+        // [END logging_write_log_entry]
 
-        // [START list_log_entries]
+        // [START logging_list_log_entries]
         private void ListLogEntries(string logId)
         {
             var client = LoggingServiceV2Client.Create();
             LogName logName = new LogName(s_projectId, logId);
             ProjectName projectName = new ProjectName(s_projectId);
-            IEnumerable<string> projectIds = new string[] { projectName.ToString() };
-            var results = client.ListLogEntries(projectIds, $"logName={logName.ToString()}",
+            var results = client.ListLogEntries(Enumerable.Repeat(projectName, 1), $"logName={logName.ToString()}",
                 "timestamp desc", callSettings: _retryAWhile);
             foreach (var row in results)
             {
                 Console.WriteLine($"{row.TextPayload.Trim()}");
             }
         }
-        // [END list_log_entries]
+        // [END logging_list_log_entries]
 
-        // [START create_log_sink]
+        // [START logging_create_sink]
         private void CreateSink(string sinkId, string logId)
         {
             var sinkClient = ConfigServiceV2Client.Create();
@@ -127,57 +126,56 @@ namespace GoogleCloudSamples
             myLogSink.Filter = $"logName={logName.ToString()}AND severity<=ERROR";
             ProjectName projectName = new ProjectName(s_projectId);
             sinkRequest.Sink = myLogSink;
-            sinkClient.CreateSink(ParentNameOneof.From(projectName), myLogSink, _retryAWhile);
+            sinkClient.CreateSink(projectName, myLogSink, _retryAWhile);
             Console.WriteLine($"Created sink: {sinkId}.");
         }
-        // [END create_log_sink]
+        // [END logging_create_sink]
 
-        // [START list_log_sinks]
+        // [START logging_list_sinks]
         private void ListSinks()
         {
             var sinkClient = ConfigServiceV2Client.Create();
             ProjectName projectName = new ProjectName(s_projectId);
-            var listOfSinks = sinkClient.ListSinks(ParentNameOneof.From(projectName),
-                callSettings: _retryAWhile);
+            var listOfSinks = sinkClient.ListSinks(projectName, callSettings: _retryAWhile);
             foreach (var sink in listOfSinks)
             {
                 Console.WriteLine($"{sink.Name} {sink.ToString()}");
             }
         }
-        // [END list_log_sinks]
+        // [END logging_list_sinks]
 
-        // [START update_log_sink]
+        // [START logging_update_sink]
         private void UpdateSinkLog(string sinkId, string logId)
         {
             var sinkClient = ConfigServiceV2Client.Create();
             LogName logName = new LogName(s_projectId, logId);
-            SinkName sinkName = new SinkName(s_projectId, sinkId);
-            var sink = sinkClient.GetSink(SinkNameOneof.From(sinkName), _retryAWhile);
+            LogSinkName sinkName = new LogSinkName(s_projectId, sinkId);
+            var sink = sinkClient.GetSink(sinkName, _retryAWhile);
             sink.Filter = $"logName={logName.ToString()}AND severity<=ERROR";
-            sinkClient.UpdateSink(SinkNameOneof.From(sinkName), sink, _retryAWhile);
+            sinkClient.UpdateSink(sinkName, sink, _retryAWhile);
             Console.WriteLine($"Updated {sinkId} to export logs from {logId}.");
         }
-        // [END update_log_sink]
+        // [END logging_update_sink]
 
-        // [START delete_log]
+        // [START logging_delete_log]
         private void DeleteLog(string logId)
         {
             var client = LoggingServiceV2Client.Create();
             LogName logName = new LogName(s_projectId, logId);
-            client.DeleteLog(LogNameOneof.From(logName), _retryAWhile);
+            client.DeleteLog(logName, _retryAWhile);
             Console.WriteLine($"Deleted {logId}.");
         }
-        // [END delete_log]
+        // [END logging_delete_log]
 
-        // [START delete_log_sink]
+        // [START logging_delete_sink]
         private void DeleteSink(string sinkId)
         {
             var sinkClient = ConfigServiceV2Client.Create();
-            SinkName sinkName = new SinkName(s_projectId, sinkId);
-            sinkClient.DeleteSink(SinkNameOneof.From(sinkName), _retryAWhile);
+            LogSinkName sinkName = new LogSinkName(s_projectId, sinkId);
+            sinkClient.DeleteSink(sinkName, _retryAWhile);
             Console.WriteLine($"Deleted {sinkId}.");
         }
-        // [END delete_log_sink]
+        // [END logging_delete_sink]
 
         public int Run(string[] args)
         {
