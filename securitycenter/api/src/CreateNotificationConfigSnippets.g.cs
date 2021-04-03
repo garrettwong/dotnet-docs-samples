@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-// [START scc_create_notification_config]
+// [START securitycenter_create_notification_config]
 
 using Google.Api.Gax.ResourceNames;
 using Google.Cloud.SecurityCenter.V1;
@@ -47,4 +47,4 @@ public class CreateNotificationConfigSnippets
         return response;
     }
 }
-// [END scc_create_notification_config]
+// [END securitycenter_create_notification_config]

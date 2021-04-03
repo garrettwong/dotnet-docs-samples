@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-// [START scc_list_notification_configs]
+// [START securitycenter_list_notification_configs]
 
 using Google.Api.Gax.ResourceNames;
 using Google.Api.Gax;
@@ -38,4 +38,4 @@ public class ListNotificationConfigSnippets
         return notificationConfigs;
     }
 }
-// [END scc_list_notification_configs]
+// [END securitycenter_list_notification_configs]

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using System.Threading.Tasks;
 using Xunit;
 
 [Collection(nameof(SpannerFixture))]
@@ -25,7 +26,7 @@ public class UpdateDataWithTimestampColumnTest
     }
 
     [Fact]
-    public async void TestUpdateDataWithTimestampColumn()
+    public async Task TestUpdateDataWithTimestampColumn()
     {
         UpdateDataWithTimestampColumnAsyncSample sample = new UpdateDataWithTimestampColumnAsyncSample();
         var rowCount = await sample.UpdateDataWithTimestampColumnAsync(_spannerFixture.ProjectId, _spannerFixture.InstanceId, _spannerFixture.DatabaseId);
